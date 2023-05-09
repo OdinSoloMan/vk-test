@@ -12,6 +12,7 @@ namespace VK_test.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+
         public UsersController(IUserService userService)
         {
             _userService = userService;
@@ -29,6 +30,24 @@ namespace VK_test.Controllers
         public async Task<string> Login([FromBody] UserDTO userDTO)
         {
             return await _userService.Login(userDTO);
+        }
+        
+        [HttpGet("[action]")]
+        public async Task<IQueryable<UserInfo>> GetUsers()
+        {
+            return await _userService.GetUsers();
+        }
+
+        [HttpGet("[action]/{id}")]
+        public async Task<UserInfo> GetUser([FromRoute] int id)
+        {
+            return await _userService.GetUser(id);
+        }
+
+        [HttpDelete("[action]/{id}")]
+        public async Task DeleteUser([FromRoute] int id)
+        {
+            await _userService.DeleteUser(id);
         }
     }
 }

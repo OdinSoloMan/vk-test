@@ -81,6 +81,7 @@ namespace Infrastructure.Repository
             var user = await _entities.FindAsync(id);
             if (user != null)
             {
+                user.UsersStateId = (int)UserStateCode.Blocked;
                 _entities.Update(user);
                 await _context.SaveChangesAsync();
             }
