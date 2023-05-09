@@ -6,8 +6,8 @@ namespace Infrastructure.Enums
     public enum UserGroupCode
     {
         [Display(Name = "Admin")]
-        Admin,
+        Admin = 1,
         [Display(Name = "User")]
-        User
+        User = 2,
     }
 }
