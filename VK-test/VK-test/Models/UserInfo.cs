@@ -1,0 +1,14 @@
+﻿using Infrastructure.Models;
+
+namespace VK_test.Models
+{
+    public class UserInfo
+    {
+        public int Id { get; set; }
+        public string Login { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public DateTime? CreatedDate { get; set; } = DateTime.UtcNow;
+        public string UserGroup { get; set; } = string.Empty;
+        public string UserState { get; set; } = string.Empty;
+    }
+}

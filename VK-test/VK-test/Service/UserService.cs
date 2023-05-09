@@ -1,5 +1,7 @@
-﻿using Infrastructure.Models;
+﻿using AutoMapper;
+using Infrastructure.Models;
 using Infrastructure.Repository;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -12,44 +14,22 @@ namespace VK_test.Service
     {
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
+        private readonly IMapper _mapper;
 
-        public UserService(IUserRepository userRepository, IConfiguration configuration)
+        public UserService(
+            IUserRepository userRepository,
+            IConfiguration configuration,
+            IMapper mapper)
         {
             _userRepository = userRepository;
             _configuration = configuration;
+            _mapper = mapper;
         }
 
         public async Task<Users> CreateUser(UserDTO userDTO)
         {
             var user = new Users { Login = userDTO.Username, Password = EncodePasswordToBase64(userDTO.Password) };
             return await _userRepository.AddAsync(user);
-        }
-
-        private string EncodePasswordToBase64(string password)
-        {
-            try
-            {
-                byte[] encData_byte = new byte[password.Length];
-                encData_byte = Encoding.UTF8.GetBytes(password);
-                string encodedData = Convert.ToBase64String(encData_byte);
-                return encodedData;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Ошибка в base64Encode" + ex.Message);
-            }
-        }
-
-        private string DecodeFrom64(string encodedData)
-        {
-            UTF8Encoding encoder = new UTF8Encoding();
-            Decoder utf8Decode = encoder.GetDecoder();
-            byte[] todecode_byte = Convert.FromBase64String(encodedData);
-            int charCount = utf8Decode.GetCharCount(todecode_byte, 0, todecode_byte.Length);
-            char[] decoded_char = new char[charCount];
-            utf8Decode.GetChars(todecode_byte, 0, todecode_byte.Length, decoded_char, 0);
-            string result = new(decoded_char);
-            return result;
         }
 
         public async Task<string> Login(UserDTO userDTO)
@@ -75,6 +55,42 @@ namespace VK_test.Service
             var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
             return tokenString;
+        }
+
+        public async Task<IQueryable<UserInfo>> GetUsers()
+        {
+            return _mapper.ProjectTo<UserInfo>(
+                    await _userRepository.GetAllAsync()
+                );
+        }
+
+        public async Task<UserInfo> GetUser(int id)
+        {
+            var user = await _userRepository.Where(x => x.Id == id)
+                .Include(m => m.UsersGroup)
+                .Include(m => m.UsersState)
+                .FirstOrDefaultAsync(x => x.Id == id);
+            return _mapper.Map<UserInfo>(user);
+        }
+
+        public async Task DeleteUser(int id)
+        {
+            await _userRepository.DeleteAsync(id);
+        }
+
+        private string EncodePasswordToBase64(string password)
+        {
+            try
+            {
+                byte[] encData_byte = new byte[password.Length];
+                encData_byte = Encoding.UTF8.GetBytes(password);
+                string encodedData = Convert.ToBase64String(encData_byte);
+                return encodedData;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Ошибка в base64Encode" + ex.Message);
+            }
         }
     }
 }

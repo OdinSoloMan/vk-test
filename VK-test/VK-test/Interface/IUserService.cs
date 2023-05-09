@@ -7,5 +7,8 @@ namespace VK_test.Interface
     {
         Task<Users> CreateUser(UserDTO userDTO);
         Task<string> Login(UserDTO userDTO);
+        Task<UserInfo> GetUser(int  id);
+        Task<IQueryable<UserInfo>> GetUsers();
+        Task DeleteUser(int id);
     }
 }
