@@ -1,8 +1,13 @@
-﻿namespace Infrastructure.Enums
+﻿using System.ComponentModel.DataAnnotations;
+using System.Xml.Linq;
+
+namespace Infrastructure.Enums
 {
     public enum UserStateCode
     {
-        Active,
-        Blocked
+        [Display(Name = "Active")]
+        Active = 1,
+        [Display(Name = "Blocked")]
+        Blocked = 2,
     }
 }
