@@ -4,8 +4,14 @@ using VK_test.Models;
 
 namespace VK_test.Helpers
 {
-    public class AutoMapperProfile: Profile
+    /// <summary>
+    /// Кастомный маппер
+    /// </summary>
+    public class AutoMapperProfile : Profile
     {
+        /// <summary>
+        /// Конструктор AutoMapperProfile
+        /// </summary>
         public AutoMapperProfile()
         {
             CreateMap<Users, UserInfo>()

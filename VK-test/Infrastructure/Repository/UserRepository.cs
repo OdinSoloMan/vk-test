@@ -2,35 +2,47 @@
 using Infrastructure.Enums;
 using Infrastructure.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Infrastructure.Repository
 {
     public class UserRepository : BaseRepository<Users>, IUserRepository
     {
-        public UserRepository(ApplicationDbContext context) : base(context)
+        private readonly IMemoryCache _cache;
+
+        public UserRepository(
+            ApplicationDbContext context,
+            IMemoryCache cache) : base(context)
         {
+            _cache = cache;
         }
 
-        /// <summary>
-        /// Добавление пользователя
-        /// </summary>
-        /// <param name="user">Пользователь</param>
-        /// <returns></returns>
         public override async Task<Users> AddAsync(Users user)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            if (_cache.TryGetValue(user.Login, out DateTime when))
+            {
+                var seconds = (DateTime.Now - when).TotalSeconds;
+                if (seconds < 5)
+                {
+                    throw new Exception("Пользователь с таким же логином уже регистрируется");
+                }
+            }
 
-            await UserExistsAsync(user.Login, user.UsersGroup?.Code);
+            _cache.Set(user.Login, DateTime.Now);
 
             await Task.Delay(1000);
 
-            var lokcObject = new object();
+            using var transaction = _context.Database.BeginTransaction();
+
+            UserExists(user.Login, user.UsersGroup?.Code);
+
+            var lockObject = new object();
 
             try
             {
-                lock (lokcObject)
+                lock (lockObject)
                 {
-                    _ = UserExistsAsync(user.Login, user.UsersGroup?.Code);
+                    UserExists(user.Login, user.UsersGroup?.Code);
 
                     user.UsersGroupId = (int)UserGroupCode.User;
                     user.UsersStateId = (int)UserStateCode.Active;
@@ -38,42 +50,15 @@ namespace Infrastructure.Repository
                     _context.User.Add(user);
                     _context.SaveChanges();
 
-                    transaction.CommitAsync();
-                }
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-            return user;
-        }
-
-        public override async Task UpdateAsync(Users user)
-        {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-            await UserExistsAsync(user.Login, user.UsersGroup!.Code);
-
-            var lokcObject = new object();
-
-            try
-            {
-                lock (lokcObject)
-                {
-                    _ = UserExistsAsync(user.Login, user.UsersGroup!.Code);
-
-                    _entities.Update(user);
-                    _context.SaveChanges();
-
                     transaction.Commit();
                 }
             }
             catch
             {
-                await transaction.RollbackAsync();
+                transaction.Rollback();
                 throw;
             }
+            return user;
         }
 
         public override async Task DeleteAsync(int id)
@@ -87,38 +72,76 @@ namespace Infrastructure.Repository
             }
         }
 
+        public async Task<Users?> GetUser(string login, string password)
+        {
+            return await _entities.FirstOrDefaultAsync(x => x.Login == login && x.Password == password);
+        }
+
+        public async Task ChangeAdmin(int newAdmin)
+        {
+            await Task.Run(() =>
+            {
+                using var transaction = _context.Database.BeginTransaction();
+
+                var lockObject = new object();
+
+                try
+                {
+                    lock (lockObject)
+                    {
+                        var newAdminSystem = _entities.Include(m => m.UsersGroup).FirstOrDefault(x => x.Id == newAdmin);
+
+                        if (newAdminSystem == null)
+                        {
+                            throw new Exception("Такого пользователя нету");
+                        }
+
+                        var oldAdmin = _entities.Include(m => m.UsersGroup).FirstOrDefault(x => x!.UsersGroup!.Code == UserGroupCode.Admin);
+
+
+                        if (oldAdmin != null)
+                        {
+                            oldAdmin!.UsersGroupId = (int)UserGroupCode.User;
+                            _entities.Update(oldAdmin);
+                        }
+
+                        newAdminSystem!.UsersGroupId = (int)UserGroupCode.Admin;
+                        _entities.Update(newAdminSystem);
+
+                        _context.SaveChanges();
+
+                        transaction.Commit();
+                    }
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+            });
+        }
 
         /// <summary>
-        /// Проверка на дубликаты
+        /// Проверка на дубликаты и администратора
         /// </summary>
-        /// <param name="login"></param>
-        /// <returns></returns>
-        private async Task UserExistsAsync(string login, UserGroupCode? groupCode = UserGroupCode.User)
+        /// <param name="login">Логин пользователя</param>
+        /// <param name="groupCode">UserGroupCode пользователя</param>
+        /// <exception cref="Exception">Выдаст ошибку если нет соблюдения правил</exception>
+        private void UserExists(string login, UserGroupCode? groupCode = UserGroupCode.User)
         {
-            var checkLoginUser = await _context.User.AnyAsync(u => u.Login == login);
+            var checkLoginUser = _context.User.Any(u => u.Login == login);
             if (checkLoginUser)
             {
                 throw new Exception("Пользователь с таким логином уже существует");
             }
             if (groupCode == UserGroupCode.Admin)
             {
-                var userExistsRoleAdmin = await _context.User.AnyAsync(u => u.UsersGroup!.Code == UserGroupCode.Admin);
+                var userExistsRoleAdmin = _context.User.Any(u => u.UsersGroup!.Code == UserGroupCode.Admin);
                 if (userExistsRoleAdmin)
                 {
                     throw new Exception("Два админа не может быть в системе");
                 }
             }
-        }
-
-        /// <summary>
-        /// Получение пользователя
-        /// </summary>
-        /// <param name="login"></param>
-        /// <param name="password"></param>
-        /// <returns></returns>
-        public async Task<Users?> GetUser(string login, string password)
-        {
-            return await _entities.FirstOrDefaultAsync(x => x.Login == login && x.Password == password);
         }
     }
 }
