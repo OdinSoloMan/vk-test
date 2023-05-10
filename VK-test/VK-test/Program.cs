@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Reflection;
 using System.Text;
 using VK_test.Interface;
+using VK_test.Models;
 using VK_test.Service;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +38,9 @@ builder.Services.AddSwaggerGen(options =>
             new List<string>()
         }
     });
+
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
 });
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
@@ -57,7 +62,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddTransient<IUserService, UserService>(); 
+builder.Services.AddTransient<IUserService, UserService>();
 builder.Services.AddTransient<IUserRepository, UserRepository>();
 
 builder.Services.AddControllers();
@@ -67,6 +72,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
@@ -82,7 +88,7 @@ app.UseExceptionHandler(a => a.Run(async context =>
     var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
     var exception = exceptionHandlerPathFeature?.Error;
 
-    await context.Response.WriteAsJsonAsync(new { error = exception?.Message });
+    await context.Response.WriteAsJsonAsync(new MessageDTO() { Message = $"Ошибка: {exception?.Message}" });
 }));
 
 
