@@ -30,7 +30,7 @@ namespace Infrastructure.Repository
 
             _cache.Set(user.Login, DateTime.Now);
 
-            await Task.Delay(1000);
+            await Task.Delay(5000);
 
             using var transaction = _context.Database.BeginTransaction();
 
